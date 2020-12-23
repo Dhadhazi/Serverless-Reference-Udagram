@@ -40,6 +40,8 @@ export const handler: APIGatewayProxyHandler = async (
   const imageId = uuid.v4();
   const newItem = await createImage(groupId, imageId, event);
 
+  const url = getUploadUrl(imageId);
+
   return {
     statusCode: 201,
     headers: {
@@ -47,6 +49,7 @@ export const handler: APIGatewayProxyHandler = async (
     },
     body: JSON.stringify({
       newItem: newItem,
+      uploadUrl: url,
     }),
   };
 };
@@ -74,6 +77,7 @@ async function createImage(groupId, imageId, event) {
     timestamp,
     imageId,
     ...newImage,
+    imageUrl: `https://${bucketName}.s3.amazonaws.com/${imageId}`,
   };
 
   await docClient
@@ -84,4 +88,12 @@ async function createImage(groupId, imageId, event) {
     .promise();
 
   return newItem;
+}
+
+function getUploadUrl(imageId: string) {
+  return s3.getSignedUrl("putObject", {
+    Bucket: bucketName,
+    Key: imageId,
+    Expires: urlExpiration,
+  });
 }
