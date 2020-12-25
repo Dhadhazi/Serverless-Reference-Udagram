@@ -2,10 +2,7 @@ service:
   name: serverless-udagram-app
 plugins:
   - serverless-webpack
-custom:
-  webpack:
-    webpackConfig: ./webpack.config.js
-    includeModules: true
+
 provider:
   name: aws
   runtime: nodejs12.x
@@ -53,19 +50,25 @@ provider:
         - dynamodb:DeleteItem
       Resource: arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}
 
-documentation:
-  api:
-    info:
-      version: v1.0.0
-      title: Udagram API
-      description: Serverless application for images sharing
-  models:
-    - name: GroupRequest
-      contentType: application/json
-      schema: ${file(models/create-group-request.json)}
-    - name: ImageRequest
-      contentType: application/json
-      schema: ${file(models/create-image-request.json)}
+
+custom:
+  topicName: ImagesTopic-${self:provider.stage}
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+  documentation:
+    api:
+      info:
+        version: v1.0.0
+        title: Udagram API
+        description: Serverless application for images sharing
+    models:
+      - name: GroupRequest
+        contentType: application/json
+        schema: ${file(models/create-group-request.json)}
+      - name: ImageRequest
+        contentType: application/json
+        schema: ${file(models/create-image-request.json)}
 
 functions:
   GetGroups:
@@ -132,9 +135,14 @@ functions:
   SendUploadNotifications:
     environment:
       STAGE: ${self:provider.stage}
+      REGION: ${self:provider.region}
       API_ID:
         Ref: WebsocketsApi
     handler: src/lambda/s3/sendNotifications.handler
+    events:
+      - sns:
+          arn: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${self:custom.topicName}
+          topicName: ${self:custom.topicName}
 
   ConnectHandler:
     handler: src/lambda/websocket/connect.handler
@@ -209,12 +217,13 @@ resources:
 
     AttachmentsBucket:
       Type: AWS::S3::Bucket
+      DependsOn: SNSTopicPolicy
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
         NotificationConfiguration:
-          LambdaConfigurations:
-          - Event: s3:ObjectCreated:*
-            Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn
+          TopicConfigurations:
+          - Event: s3:ObjectCreated:Put
+            Topic: !Ref ImagesTopic
         CorsConfiguration:
           CorsRules:
             - AllowedOrigins:
@@ -228,6 +237,30 @@ resources:
                 - DELETE
                 - HEAD
               MaxAge: 3000
+
+    ImagesTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: Image bucket topic
+        TopicName: ${self:custom.topicName}
+    
+    SNSTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                AWS: "*"
+              Action: sns:Publish
+              Resource:
+                !Ref ImagesTopic
+              Condition:
+                ArnLike:
+                  AWS:SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
+        Topics:
+          - !Ref ImagesTopic
 
     SendUploadNotificationsPermission:
       Type: AWS::Lambda::Permission
