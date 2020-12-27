@@ -61,7 +61,7 @@ provider:
         - secretsmanager:GetSecretValue
       Resource: !Ref Auth0Secret
     - Effect: Allow
-      Action: 
+      Action:
         - kms:Decrypt
       Resource: !GetAtt KMSKey.Arn
 
@@ -85,9 +85,11 @@ custom:
         schema: ${file(models/create-image-request.json)}
 
 functions:
-
   Auth:
     handler: src/lambda/auth/auth0Authorizer.handler
+
+  RS256Auth:
+    handler: src/lambda/auth/rs256Auth0Authorizer.handler
 
   GetGroups:
     handler: src/lambda/http/getGroups.handler
@@ -104,7 +106,7 @@ functions:
           method: post
           path: groups
           cors: true
-          authorizer: Auth
+          authorizer: RS256Auth
           reqValidatorName: RequestBodyValidator
           documentation:
             summary: Create a new group
@@ -144,7 +146,7 @@ functions:
           method: post
           path: groups/{groupId}/images
           cors: true
-          authorizer: Auth
+          authorizer: RS256Auth
           reqValidatorName: RequestBodyValidator
           documentation:
             summary: Create a new image
@@ -170,7 +172,7 @@ functions:
       - sns:
           arn:
             Fn::Join:
-              - ':'
+              - ":"
               - - arn:aws:sns
                 - Ref: AWS::Region
                 - Ref: AWS::AccountId
@@ -197,11 +199,11 @@ functions:
   #     - stream:
   #         type: dynamodb
   #         arn: !GetAtt ImagesDynamoDBTable.StreamArn
-  
+
 resources:
   Resources:
     GatewayResponseDefault4XX:
-      Type: 'AWS::ApiGateway::GatewayResponse'
+      Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
@@ -209,7 +211,7 @@ resources:
           gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
         ResponseType: DEFAULT_4XX
         RestApiId:
-          Ref: 'ApiGatewayRestApi'
+          Ref: "ApiGatewayRestApi"
 
     RequestBodyValidator:
       Type: AWS::ApiGateway::RequestValidator
@@ -266,8 +268,8 @@ resources:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
         NotificationConfiguration:
           TopicConfigurations:
-          - Event: s3:ObjectCreated:Put
-            Topic: !Ref ImagesTopic
+            - Event: s3:ObjectCreated:Put
+              Topic: !Ref ImagesTopic
         CorsConfiguration:
           CorsRules:
             - AllowedOrigins:
@@ -287,13 +289,12 @@ resources:
       Properties:
         BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
 
-
     ImagesTopic:
       Type: AWS::SNS::Topic
       Properties:
         DisplayName: Image bucket topic
         TopicName: ${self:custom.topicName}
-    
+
     SNSTopicPolicy:
       Type: AWS::SNS::TopicPolicy
       Properties:
@@ -304,8 +305,7 @@ resources:
               Principal:
                 AWS: "*"
               Action: sns:Publish
-              Resource:
-                !Ref ImagesTopic
+              Resource: !Ref ImagesTopic
               Condition:
                 ArnLike:
                   AWS:SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
@@ -339,12 +339,10 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
-          -
-            AttributeName: id
+          - AttributeName: id
             AttributeType: S
         KeySchema:
-          -
-            AttributeName: id
+          - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.CONNECTIONS_TABLE}
@@ -369,7 +367,7 @@ resources:
     #       Statement:
     #         -
     #           Effect: Allow
-    #           Action: 'es:ESHttp*'            
+    #           Action: 'es:ESHttp*'
     #           Principal:
     #             AWS: '*'
     #           Resource: !Sub 'arn:aws:es:${self:provider.region}:${AWS::AccountId}:domain/images-search-${self:provider.stage}/*'
@@ -378,21 +376,21 @@ resources:
       Properties:
         Description: KMS key to encrypt Auth0 secret
         KeyPolicy:
-          Version: '2012-10-17'
+          Version: "2012-10-17"
           Id: key-default-1
           Statement:
             - Sid: Allow administration of the key
               Effect: Allow
               Principal:
-                AWS: 
+                AWS:
                   Fn::Join:
-                  - ':'
-                  - - 'arn:aws:iam:'
-                    - Ref: AWS::AccountId
-                    - 'root'
+                    - ":"
+                    - - "arn:aws:iam:"
+                      - Ref: AWS::AccountId
+                      - "root"
               Action:
-                - 'kms:*'
-              Resource: '*'
+                - "kms:*"
+              Resource: "*"
 
     KMSKeyAlias:
       Type: AWS::KMS::Alias
@@ -406,4 +404,3 @@ resources:
         Name: ${self:provider.environment.AUTH_0_SECRET_ID}
         Description: Auth0 secret
         KmsKeyId: !Ref KMSKey
-    
