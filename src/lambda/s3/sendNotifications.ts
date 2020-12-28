@@ -1,8 +1,11 @@
 import { SNSHandler, S3Event, SNSEvent } from "aws-lambda";
 import "source-map-support/register";
 import * as AWS from "aws-sdk";
+import * as AWSXRay from "aws-xray-sdk";
 
-const docClient = new AWS.DynamoDB.DocumentClient();
+const XAWS = AWSXRay.captureAWS(AWS);
+
+const docClient = new XAWS.DynamoDB.DocumentClient();
 
 const connectionsTable = process.env.CONNECTIONS_TABLE;
 const stage = process.env.STAGE;
@@ -16,19 +19,18 @@ const connectionParams = {
 const apiGateway = new AWS.ApiGatewayManagementApi(connectionParams);
 
 export const handler: SNSHandler = async (event: SNSEvent) => {
-  console.log('Processing SNS event ', JSON.stringify(event));
+  console.log("Processing SNS event ", JSON.stringify(event));
 
   for (const snsRecord of event.Records) {
     const s3EventStr = snsRecord.Sns.Message;
-    console.log('Processing S3 event ', s3EventStr);
+    console.log("Processing S3 event ", s3EventStr);
     const s3Event = JSON.parse(s3EventStr);
 
-    await processS3Event(s3Event);    
+    await processS3Event(s3Event);
   }
-  
-}
+};
 
-async function processS3Event (s3Event: S3Event) {
+async function processS3Event(s3Event: S3Event) {
   for (const record of s3Event.Records) {
     const key = record.s3.object.key;
     console.log("Processing S3 item with key: ", key);
@@ -48,7 +50,7 @@ async function processS3Event (s3Event: S3Event) {
       await sendMessageToClient(connectionId, payload);
     }
   }
-};
+}
 
 async function sendMessageToClient(connectionId, payload) {
   try {

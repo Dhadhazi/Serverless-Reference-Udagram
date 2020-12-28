@@ -1,35 +1,34 @@
-import {SNSEvent, SNSHandler, S3EventRecord} from 'aws-lambda'
-import 'source-map-support/register'
-import * as AWS from 'aws-sdk'
-import Jimp from 'jimp/es';
+import { SNSEvent, SNSHandler, S3EventRecord } from "aws-lambda";
+import "source-map-support/register";
+import * as AWS from "aws-sdk";
+import Jimp from "jimp/es";
 
-const s3 = new AWS.S3()
+const s3 = new AWS.S3();
 
-
-const imagesBucketName = process.env.IMAGES_S3_BUCKET
-const thumbnailBucketName = process.env.THUMBNAILS_S3_BUCKET
+const imagesBucketName = process.env.IMAGES_S3_BUCKET;
+const thumbnailBucketName = process.env.THUMBNAILS_S3_BUCKET;
 
 export const handler: SNSHandler = async (event: SNSEvent) => {
-  console.log('Processing SNS event ', JSON.stringify(event));
+  console.log("Processing SNS event ", JSON.stringify(event));
   for (const snsRecord of event.Records) {
     const s3EventStr = snsRecord.Sns.Message;
-    console.log('Processing S3 event ', s3EventStr);
+    console.log("Processing S3 event ", s3EventStr);
     const s3Event = JSON.parse(s3EventStr);
-    
+
     for (const record of s3Event.Records) {
       await resizeImage(record);
     }
   }
-}
+};
 
 async function resizeImage(record: S3EventRecord) {
   const key = record.s3.object.key;
-  console.log('Processing S3 item with key: ', key)
+  console.log("Processing S3 item with key: ", key);
 
   const response = await s3
     .getObject({
       Bucket: imagesBucketName,
-      Key: key
+      Key: key,
     })
     .promise();
 
@@ -39,7 +38,7 @@ async function resizeImage(record: S3EventRecord) {
   const image = await Jimp.read(body);
 
   // Resize the image maintaining the aspect ratio
-  console.log('Resizing image');
+  console.log("Resizing image");
   image.resize(150, Jimp.AUTO);
 
   // Convert the image to a buffer that we can write to a different bucket
@@ -50,7 +49,7 @@ async function resizeImage(record: S3EventRecord) {
     .putObject({
       Bucket: thumbnailBucketName,
       Key: `${key}.jpeg`,
-      Body: convertedBuffer
+      Body: convertedBuffer,
     })
     .promise();
 }

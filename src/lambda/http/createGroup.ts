@@ -7,7 +7,6 @@ import "source-map-support/register";
 
 import { CreateGroupRequest } from "../../requests/CreateGroupRequest";
 import { createGroup } from "../../businessLogic/groups";
-import { getUserId } from "../../auth/utils";
 
 export const handler: APIGatewayProxyHandler = async (
   event: APIGatewayProxyEvent
