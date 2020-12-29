@@ -3,6 +3,7 @@ service:
 plugins:
   - serverless-webpack
   - serverless-plugin-canary-deployments
+  - serverless-iam-roles-per-function
 
 package:
   individually: true
